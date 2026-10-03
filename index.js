@@ -1,59 +1,78 @@
 require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
-const { Client, GatewayIntentBits, Events, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, MessageFlags } = require('discord.js');
+const {
+  Client,
+  GatewayIntentBits,
+  Events,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  EmbedBuilder,
+  MessageFlags
+} = require('discord.js');
 
 const app = express();
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.DirectMessages]
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.DirectMessages
+  ]
 });
 
+// ✅ CONFIGURAÇÕES — USA AS VARIÁVEIS DO RENDER
 const CLIENT_ID = process.env.CLIENT_ID;
 const CLIENT_SECRET = process.env.CLIENT_SECRET;
 const REDIRECT_URI = 'https://bot-token-v15h.onrender.com/callback';
 const PORT = process.env.PORT || 10000;
 
-// ========== CALLBACK — AQUI ACONTECE TUDO ==========
+// ========== ROTA DE CALLBACK ==========
 app.get('/callback', async (req, res) => {
   const { code } = req.query;
-  if (!code) return res.send('❌ Sem código!');
+
+  if (!code) {
+    return res.send('❌ Código não recebido!');
+  }
 
   try {
-    // 1️⃣ PEDIR TOKEN AO DISCORD — LIMPO, SEM CONFUSÃO
-    const resposta = await axios.post(
+    // 🔑 TROCA O CÓDIGO PELO TOKEN — EXATAMENTE COMO DOCUMENTAÇÃO DO DISCORD
+    const tokenRes = await axios.post(
       'https://discord.com/api/oauth2/token',
       new URLSearchParams({
         client_id: CLIENT_ID,
         client_secret: CLIENT_SECRET,
         grant_type: 'authorization_code',
         code: code,
-        redirect_uri: REDIRECT_URI,
-        scope: 'identify email'
+        redirect_uri: REDIRECT_URI
       }),
-      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+      {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        }
+      }
     );
 
-    // ✅ PEGAR APENAS O QUE VEM DO DISCORD
-    const { access_token, refresh_token, expires_in } = resposta.data;
+    const { access_token, refresh_token, expires_in } = tokenRes.data;
 
-    // 🔑 VERIFICAÇÃO OBRIGATÓRIA
-    if (!access_token || access_token.includes('.')) {
-      console.log('❌ TOKEN ERRADO RECEBIDO:', access_token);
-      return res.send('❌ ERRO: Token inválido do Discord! Verifique CLIENT_ID e CLIENT_SECRET.');
+    // 📋 DEBUG — MOSTRA EXATAMENTE O QUE VEIO DO DISCORD
+    console.log('=== RESPOSTA DO DISCORD ===');
+    console.log('access_token:', access_token);
+    console.log('token_type:', tokenRes.data.token_type);
+    console.log('===========================');
+
+    if (!access_token) {
+      return res.send(`❌ Sem access_token: ${JSON.stringify(tokenRes.data)}`);
     }
 
-    // ✅ PEGAR DADOS DO USUÁRIO
-    const userResp = await axios.get('https://discord.com/api/users/@me', {
+    // ✅ PEGA DADOS DO USUÁRIO
+    const userRes = await axios.get('https://discord.com/api/users/@me', {
       headers: { Authorization: `Bearer ${access_token}` }
     });
 
-    const usuario = `${userResp.data.username}#${userResp.data.discriminator || '0'}`;
-    const userId = userResp.data.id;
+    const usuario = `${userRes.data.username}#${userRes.data.discriminator || '0'}`;
+    const userId = userRes.data.id;
 
-    console.log(`✅ TOKEN REAL GERADO para: ${usuario}`);
-    console.log(`🔑 Token: ${access_token.substring(0, 40)}...`);
-
-    // ✅ ENVIAR PARA O DISCORD
+    // ✅ ENVIA MENSAGEM NO DISCORD
     try {
       const user = await client.users.fetch(userId);
       await user.send({
@@ -71,10 +90,10 @@ app.get('/callback', async (req, res) => {
         ]
       });
     } catch (e) {
-      console.log('⚠️ Erro DM:', e.message);
+      console.log('⚠️ Erro ao enviar DM:', e.message);
     }
 
-    // ✅ PÁGINA DE CONFIRMAÇÃO
+    // ✅ PÁGINA DE SUCESSO
     res.send(`
       <html>
         <body style="background:#111;color:#fff;font-family:arial;text-align:center;padding-top:100px">
@@ -82,15 +101,15 @@ app.get('/callback', async (req, res) => {
           <h2>usuario:</h2>
           <h1 style="color:#5865F2">[${usuario}]</h1>
           <p style="font-size:20px;margin-top:50px;font-weight:bold">ZEROUN SYSTEM, SEMPRE A FRENTE</p>
-          <p style="margin-top:30px;color:#888">Pode fechar ✅</p>
+          <p style="margin-top:30px;color:#aaa">Pode fechar ✅</p>
           <script>setTimeout(()=>window.close(),2500)</script>
         </body>
       </html>
     `);
 
   } catch (erro) {
-    console.error('❌ ERRO GERAL:', erro.response?.data || erro.message);
-    res.send(`<pre>${JSON.stringify(erro.response?.data || erro.message, null, 2)}</pre>`);
+    console.error('❌ ERRO:', erro.response?.data || erro.message);
+    res.send(`<pre>ERRO: ${JSON.stringify(erro.response?.data || erro.message, null, 2)}</pre>`);
   }
 });
 
@@ -107,23 +126,29 @@ client.once(Events.ClientReady, async () => {
     name: 'autorizar',
     description: 'Gerar token de acesso'
   });
-  console.log('✅ Comando Pronto');
+  console.log('✅ Comando /autorizar pronto');
 });
 
 client.on(Events.InteractionCreate, async i => {
   if (!i.isChatInputCommand() || i.commandName !== 'autorizar') return;
-  
-  const url = `https://discord.com/api/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=identify%20email`;
-  
+
+  const authUrl = `https://discord.com/api/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=identify%20email`;
+
   await i.reply({
-    embeds: [new EmbedBuilder()
-      .setTitle('🔐 Autorização — ZEROUN SYSTEM')
-      .setDescription('Clique abaixo e autorize ✅')
-      .setColor(0x5865F2)
+    embeds: [
+      new EmbedBuilder()
+        .setTitle('🔐 Autorização — ZEROUN SYSTEM')
+        .setDescription('1. Clique abaixo → autorize no Discord\n2. Página de confirmação vai aparecer ✅\n3. O token chegará por mensagem direta 📩')
+        .setColor(0x5865F2)
     ],
-    components: [new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setURL(url).setLabel('🔗 Autorizar').setStyle(ButtonStyle.Link)
-    )],
+    components: [
+      new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setURL(authUrl)
+          .setLabel('🔗 Autorizar Conta')
+          .setStyle(ButtonStyle.Link)
+      )
+    ],
     flags: MessageFlags.Ephemeral
   });
 });
