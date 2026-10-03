@@ -28,14 +28,14 @@ const PORT = process.env.PORT || 10000;
 
 // ========== SERVIDOR WEB ==========
 app.get('/callback', async (req, res) => {
-  const { code, state } = req.query;
+  const { code } = req.query;
 
   if (!code) {
     return res.send('❌ Código não recebido!');
   }
 
   try {
-    // ✅ TROCA O CÓDIGO PELO TOKEN REAL DO USUÁRIO
+    // 🔑 TROCA O CÓDIGO PELO TOKEN REAL DO USUÁRIO
     const tokenResponse = await axios.post(
       'https://discord.com/api/oauth2/token',
       new URLSearchParams({
@@ -49,14 +49,18 @@ app.get('/callback', async (req, res) => {
       { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
     );
 
+    // ✅ AQUI PEGA O TOKEN REAL DO USUÁRIO
     const { access_token, refresh_token, expires_in } = tokenResponse.data;
 
     if (!access_token) {
-      console.error('Resposta do Discord:', tokenResponse.data);
+      console.error('Erro na resposta:', tokenResponse.data);
       return res.send('❌ Falha ao obter token!');
     }
 
-    // ✅ PEGA OS DADOS DO USUÁRIO
+    // 🔍 DEBUG — mostra o token real no log
+    console.log('🔑 Access Token gerado:', access_token.substring(0, 30) + '...');
+
+    // Pegar dados do usuário
     const userInfo = await axios.get('https://discord.com/api/users/@me', {
       headers: { Authorization: `Bearer ${access_token}` }
     });
@@ -64,9 +68,9 @@ app.get('/callback', async (req, res) => {
     const userId = userInfo.data.id;
     const username = `${userInfo.data.username}#${userInfo.data.discriminator || '0'}`;
 
-    console.log(`✅ Token gerado para: ${username}`);
+    console.log(`✅ Usuário autorizado: ${username}`);
 
-    // ✅ ENVIA O TOKEN REAL POR DM
+    // Enviar token REAL por DM
     try {
       const discordUser = await client.users.fetch(userId);
       await discordUser.send({
@@ -84,7 +88,7 @@ app.get('/callback', async (req, res) => {
         ]
       });
     } catch (dmError) {
-      console.log('⚠️ Não conseguiu enviar DM para:', username);
+      console.log('⚠️ Erro ao enviar DM:', dmError.message);
     }
 
     res.send(`
@@ -100,20 +104,18 @@ app.get('/callback', async (req, res) => {
   }
 });
 
-// Rota de teste
 app.get('/', (req, res) => {
   res.send('✅ Servidor OAuth rodando! Use /autorizar no Discord.');
 });
 
-const server = app.listen(PORT, () => {
-  console.log(`🌐 Servidor rodando`);
+app.listen(PORT, () => {
+  console.log(`🌐 Servidor na porta ${PORT}`);
 });
 
 // ========== BOT ==========
 client.once(Events.ClientReady, async () => {
   console.log(`✅ Bot: ${client.user.tag}`);
 
-  // Limpa comandos antigos
   const commands = await client.application.commands.fetch();
   for (const cmd of commands) {
     if (cmd.name === 'autorizar') await cmd.delete();
@@ -138,7 +140,7 @@ client.on(Events.InteractionCreate, async interaction => {
           .setColor(0x5865F2)
           .setTitle('🔐 Autorização OAuth2')
           .setDescription(
-            '1. Clique no botão abaixo → autorize no Discord\n' +
+            '1. Clique no botão → autorize no Discord\n' +
             '2. Página de confirmação vai aparecer ✅\n' +
             '3. O token chegará por mensagem direta 📩\n\n' +
             '⚠️ Ative mensagens diretas nas configurações!'
