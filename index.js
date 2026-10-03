@@ -35,7 +35,7 @@ app.get('/callback', async (req, res) => {
   }
 
   try {
-    // 🔑 TROCA O CÓDIGO PELO TOKEN REAL DO USUÁRIO
+    // 🔑 Troca código pelo token REAL do usuário
     const tokenResponse = await axios.post(
       'https://discord.com/api/oauth2/token',
       new URLSearchParams({
@@ -49,7 +49,6 @@ app.get('/callback', async (req, res) => {
       { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
     );
 
-    // ✅ AQUI PEGA O TOKEN REAL DO USUÁRIO
     const { access_token, refresh_token, expires_in } = tokenResponse.data;
 
     if (!access_token) {
@@ -57,45 +56,50 @@ app.get('/callback', async (req, res) => {
       return res.send('❌ Falha ao obter token!');
     }
 
-    // 🔍 DEBUG — mostra o token real no log
-    console.log('🔑 Access Token gerado:', access_token.substring(0, 30) + '...');
-
     // Pegar dados do usuário
     const userInfo = await axios.get('https://discord.com/api/users/@me', {
       headers: { Authorization: `Bearer ${access_token}` }
     });
 
-    const userId = userInfo.data.id;
     const username = `${userInfo.data.username}#${userInfo.data.discriminator || '0'}`;
+    const userId = userInfo.data.id;
 
-    console.log(`✅ Usuário autorizado: ${username}`);
+    console.log(`✅ Token gerado para: ${username}`);
 
-    // Enviar token REAL por DM
+    // ✅ ENVIAR MENSAGEM NO DISCORD — SEU FORMATO
     try {
       const discordUser = await client.users.fetch(userId);
       await discordUser.send({
         embeds: [
           new EmbedBuilder()
             .setColor(0x2ECC71)
-            .setTitle('✅ Token OAuth2 Gerado!')
+            .setTitle('token gerado com sucesso')
             .addFields(
-              { name: 'Usuário', value: username },
+              { name: 'usuario:', value: `\n[${username}]` },
               { name: 'Access Token', value: `\`\`\`${access_token}\`\`\`` },
               { name: 'Expira em', value: `${Math.round(expires_in / 3600)}h` },
               { name: 'Refresh Token', value: `\`\`\`${refresh_token}\`\`\`` }
             )
+            .setFooter({ text: 'ZEROUN SYSTEM, SEMPRE A FRENTE' })
             .setTimestamp()
         ]
       });
     } catch (dmError) {
-      console.log('⚠️ Erro ao enviar DM:', dmError.message);
+      console.log('⚠️ Erro ao enviar mensagem:', dmError.message);
     }
 
+    // ✅ PÁGINA DO SITE — SEU TEXTO
     res.send(`
-      <h2>✅ Concluído!</h2>
-      <p>Usuário: <strong>${username}</strong></p>
-      <p>Token enviado por mensagem direta no Discord ✉️</p>
-      <script>setTimeout(() => window.close(), 3000);</script>
+      <html>
+        <body style="font-family: sans-serif; background: #1a1a1a; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0;">
+          <h1 style="color: #2ECC71;">✅ token gerado com sucesso</h1>
+          <h3>usuario:</h3>
+          <h2>[${username}]</h2>
+          <p style="margin-top: 40px; color: #888; font-size: 18px; font-weight: bold;">ZEROUN SYSTEM, SEMPRE A FRENTE</p>
+          <p style="margin-top: 30px; color: #aaa;">Você pode fechar esta janela ✅</p>
+          <script>setTimeout(() => window.close(), 3000);</script>
+        </body>
+      </html>
     `);
 
   } catch (error) {
@@ -105,11 +109,19 @@ app.get('/callback', async (req, res) => {
 });
 
 app.get('/', (req, res) => {
-  res.send('✅ Servidor OAuth rodando! Use /autorizar no Discord.');
+  res.send(`
+    <html>
+      <body style="font-family: sans-serif; background: #1a1a1a; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0;">
+        <h1 style="color: #5865F2;">ZEROUN SYSTEM</h1>
+        <p>Servidor OAuth ativo ✅</p>
+        <p>Use /autorizar no Discord</p>
+      </body>
+    </html>
+  `);
 });
 
 app.listen(PORT, () => {
-  console.log(`🌐 Servidor na porta ${PORT}`);
+  console.log(`🌐 Servidor rodando`);
 });
 
 // ========== BOT ==========
@@ -123,7 +135,7 @@ client.once(Events.ClientReady, async () => {
 
   await client.application.commands.create({
     name: 'autorizar',
-    description: 'Conectar conta e receber token de acesso',
+    description: 'Conectar conta e gerar token',
   });
   console.log('✅ Comando /autorizar pronto');
 });
@@ -138,12 +150,11 @@ client.on(Events.InteractionCreate, async interaction => {
       embeds: [
         new EmbedBuilder()
           .setColor(0x5865F2)
-          .setTitle('🔐 Autorização OAuth2')
+          .setTitle('🔐 Autorização — ZEROUN SYSTEM')
           .setDescription(
-            '1. Clique no botão → autorize no Discord\n' +
+            '1. Clique no botão abaixo → autorize no Discord\n' +
             '2. Página de confirmação vai aparecer ✅\n' +
-            '3. O token chegará por mensagem direta 📩\n\n' +
-            '⚠️ Ative mensagens diretas nas configurações!'
+            '3. O token chegará por mensagem direta 📩'
           )
       ],
       components: [
