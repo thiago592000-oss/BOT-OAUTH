@@ -10,7 +10,7 @@ const client = new Client({
 
 const CLIENT_ID = process.env.CLIENT_ID;
 const CLIENT_SECRET = process.env.CLIENT_SECRET;
-const REDIRECT_URI = 'https://bot-oauth.onrender.com/callback';
+const REDIRECT_URI = 'https://bot-token-v15h.onrender.com/callback';
 const PORT = process.env.PORT || 10000;
 
 // ========== CALLBACK — AQUI ACONTECE TUDO ==========
